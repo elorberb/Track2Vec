@@ -43,6 +43,7 @@ class EvalRSRecList(RecList):
         from reclist.metrics.standard_metrics import misses_at_k
         # get false positives
         m = misses_at_k(y_preds, y_test, k=TOP_K_CHALLENGE).min(axis=2)
+        m = np.min(m, axis=1)
         # convert to dataframe
         m = pd.DataFrame(m, columns=['mr'], index=y_test.index)
         # grab slice info
@@ -183,6 +184,7 @@ class EvalRSRecList(RecList):
         from reclist.metrics.standard_metrics import misses_at_k
         # get false positives
         m = misses_at_k(self._y_preds, self._y_test, k=TOP_K_CHALLENGE).min(axis=2)
+        m = np.min(m, axis=1)
         # convert to dataframe
         m = pd.DataFrame(m, columns=['mr'], index=self._y_test.index)
         # grab slice info
@@ -197,8 +199,8 @@ class EvalRSRecList(RecList):
         ans = 0 
         total = 0
         for class_, mr in df.iterrows():
-            total += mr
-            ans += np.log10(total_num_pred/track_count[class_]) * mr
+            total += mr['mr']
+            ans += np.log10(total_num_pred/track_count[class_]).iloc[0] * mr['mr']
         return float(ans/total)
 
 class EvalRSDataset(RecDataset):

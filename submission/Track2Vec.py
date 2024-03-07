@@ -50,7 +50,7 @@ class Track2Vec(RecModel):
         self.mymodel_3 = Word2Vec(p_3.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4) #, hashfxn=hash)
         self.mymodel_4 = Word2Vec(p_4.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4) #, hashfxn=hash)
 
-        p = p_1.append(p_2).append(p_3).append(p_4)
+        p = pd.concat([p_1, p_2, p_3, p_4])
 
         user_tracks = pd.DataFrame(p)
         user_tracks['playcount_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40)) 
@@ -65,11 +65,7 @@ class Track2Vec(RecModel):
         self.mymodel_f = Word2Vec(p_f.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
         self.mymodel_n = Word2Vec(p_n.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
         
-        p = p_m.append(p_f).append(p_n)
-
-        # user_tracks = pd.DataFrame(p)
-        # user_tracks['gender_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40)) 
-        # self.mappings = user_tracks.T.to_dict() # {"user_k" : {"track_id" : [...], "track_id_sampled" : [...]}}
+        p = pd.concat([p_m, p_f, p_n])
 
         user_tracks = pd.DataFrame(p)
         user_tracks['gender_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40))
@@ -91,11 +87,7 @@ class Track2Vec(RecModel):
         self.mymodel_utc2 = Word2Vec(p_2.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
         self.mymodel_utc3 = Word2Vec(p_3.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
 
-        p = p_1.append(p_2).append(p_3)
-
-        # user_tracks = pd.DataFrame(p)
-        # user_tracks['utc_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40)) 
-        # self.mappings = user_tracks.T.to_dict() # {"user_k" : {"track_id" : [...], "track_id_sampled" : [...]}}
+        p = pd.concat([p_1, p_2, p_3])
 
         user_tracks = pd.DataFrame(p)
         user_tracks['utc_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40))
@@ -113,22 +105,22 @@ class Track2Vec(RecModel):
 
     def pred_playcount(self, user, user_playcount, user_tracks):
         if user_playcount <= 10:
-            get_user_embedding = np.mean([self.mymodel_1.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_utc1.wv[t] for t in user_tracks if t in self.mymodel_utc1.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_1.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         elif 10 < user_playcount and user_playcount <= 100:
-            get_user_embedding = np.mean([self.mymodel_2.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_2.wv[t] for t in user_tracks if t in self.mymodel_2.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_2.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         elif 100 < user_playcount and user_playcount <= 1000:
-            get_user_embedding = np.mean([self.mymodel_3.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_3.wv[t] for t in user_tracks if t in self.mymodel_3.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_3.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         else:
-            get_user_embedding = np.mean([self.mymodel_4.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_4.wv[t] for t in user_tracks if t in self.mymodel_4.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_4.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
@@ -139,17 +131,17 @@ class Track2Vec(RecModel):
 
     def pred_gender(self, user, user_gender, user_tracks):
         if user_gender == 'm':
-            get_user_embedding = np.mean([self.mymodel_m.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_m.wv[t] for t in user_tracks if t in self.mymodel_m.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k 
             user_predictions = [k[0] for k in self.mymodel_m.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         elif user_gender == 'f':
-            get_user_embedding = np.mean([self.mymodel_f.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_f.wv[t] for t in user_tracks if t in self.mymodel_f.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
             user_predictions = [k[0] for k in self.mymodel_f.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         else:
-            get_user_embedding = np.mean([self.mymodel_n.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_n.wv[t] for t in user_tracks if t in self.mymodel_n.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
             user_predictions = [k[0] for k in self.mymodel_n.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
@@ -160,17 +152,17 @@ class Track2Vec(RecModel):
 
     def pred_user_track_count(self, user, user_track_count, user_tracks):
         if user_track_count <= 100:
-            get_user_embedding = np.mean([self.mymodel_utc1.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_utc1.wv[t] for t in user_tracks if t in self.mymodel_utc1.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_utc1.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         elif 100 < user_track_count and user_track_count <= 1000:
-            get_user_embedding = np.mean([self.mymodel_utc2.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_utc2.wv[t] for t in user_tracks if t in self.mymodel_utc2.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_utc2.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
         else:
-            get_user_embedding = np.mean([self.mymodel_utc3.wv[t] for t in user_tracks], axis=0)
+            get_user_embedding = np.mean([self.mymodel_utc3.wv[t] for t in user_tracks if t in self.mymodel_utc3.wv], axis=0)
             max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
             user_predictions = [k[0] for k in self.mymodel_utc3.wv.most_similar(positive=[get_user_embedding], 
                                                                         topn=max_number_of_returned_items)]
@@ -210,7 +202,12 @@ class Track2Vec(RecModel):
         
         pbar = tqdm(total=len(user_ids), position=0)
         predictions = []
+        valid_user_ids = []  # List to collect valid user IDs
         for user in user_ids['user_id']:
+            if user not in self.mappings:
+                pbar.update(1)
+                continue
+            valid_user_ids.append(user)  # Add the valid user ID to the list
             user_tracks_playcount = self.mappings[user]['playcount_track_id_sampled']
             user_tracks_gender = self.mappings[user]['gender_track_id_sampled']
             user_tracks_utc = self.mappings[user]['utc_track_id_sampled']
@@ -229,8 +226,10 @@ class Track2Vec(RecModel):
             pbar.update(1)
         pbar.close()
 
-        users = user_ids["user_id"].values.reshape(-1, 1)
+        # users = user_ids["user_id"].values.reshape(-1, 1)
+        valid_users_array = np.array(valid_user_ids).reshape(-1, 1)
         predictions = np.array(predictions)
-        predictions = np.concatenate([users, predictions], axis=1)
+        # predictions = np.concatenate([users, predictions], axis=1)
+        predictions = np.concatenate([valid_users_array, predictions], axis=1)
 
         return pd.DataFrame(predictions, columns=['user_id', *[str(i) for i in range(k)]]).set_index('user_id')

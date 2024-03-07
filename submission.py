@@ -1,21 +1,9 @@
 import os
 from datetime import datetime
-from dotenv import load_dotenv
-
-# import env variables from file
-load_dotenv('upload.env', verbose=True)
-
-# variables for the submission
-EMAIL = os.getenv('EMAIL')  # the e-mail you used to sign up
-assert EMAIL != '' and EMAIL is not None
-BUCKET_NAME = os.getenv('BUCKET_NAME')  # you received it in your e-mail
-PARTICIPANT_ID = os.getenv('PARTICIPANT_ID')  # you received it in your e-mail
-AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')  # you received it in your e-mail
-AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')  # you received it in your e-mail
 
 # set hyperparameters for Track2Vec
 vector_size = 100
-epoch = 10
+epoch = 1
 top_k = 100
 window = 60
 seed = 27
@@ -36,12 +24,7 @@ if __name__ == '__main__':
     print('\n==== Init runner at: {} ====\n'.format(datetime.utcnow()))
     # run the evaluation loop
     runner = EvalRSRunner(
-        dataset = dataset,
-        aws_access_key_id = AWS_ACCESS_KEY,
-        aws_secret_access_key = AWS_SECRET_KEY,
-        participant_id = PARTICIPANT_ID,
-        bucket_name = BUCKET_NAME,
-        email = EMAIL
+        dataset = dataset
         )
     print('==== Runner loaded, starting loop at: {} ====\n'.format(datetime.utcnow()))
     my_model = Track2Vec(
