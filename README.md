@@ -1,20 +1,25 @@
-# Track2Vec - Fairness Music Recommendation with a GPU-Free Customizable-Driven Framework
-:bulb: This is the official code of team wwweiwei to the [EvalRS Data Challenge](https://github.com/RecList/evalRS-CIKM-2022). We won the fouth place. For more details, please refer to our [paper](http://arxiv.org/abs/2210.16590) and [brief introduction](https://medium.com/@wwweiwei/cikm-2022-track2vec-fairness-music-recommendation-with-a-gpu-free-customizable-driven-framework-d1959194bfc1) in our blog. <br> 
+# Track2Vec - University Project Implementation
 
-## Usage
-### Setup
-- Build environment
-    ```
-    pip install -r /path/to/requirements.txt
-    ```
-- Place your `upload.env` in the root folder.
+This repository is part of a university project that implements the Track2Vec algorithm, originally developed by team wwweiwei for the [EvalRS Data Challenge](https://github.com/RecList/evalRS-CIKM-2022), where it achieved fourth place. For an in-depth understanding, please refer to the original [paper](http://arxiv.org/abs/2210.16590).
+
+Currently, the repository includes the codebase used in the challenge, and ongoing work is focused on enhancing and extending the algorithm with improvements (to be updated upon completion).
+
+## Usage Instructions
+
+### Setting Up the Environment
+
+```bash
+pip install -r /path/to/requirements.txt
+```
 
 ### Run script
 ```
 python submission.py
 ```
-- Notes: Our proposed metric MR-ITF will automatically report in the corresponding json file with other standard metric.
-## Introduction
+- Note: Our implementation includes the proposed MR-ITF metric, which will be reported alongside standard metrics in the output JSON file.
+
+## Introduction to Track2Vec
+The framework consists of three modules aimed at providing fairness in music recommendations, particularly within a GPU-free, customizable-driven framework.
 - Proposed Framework: Track2Vec
 <img width="624" alt="Track2Vec Framework" src="images/Track2Vec_framework.jpg">
 
