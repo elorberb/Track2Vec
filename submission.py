@@ -15,7 +15,7 @@ if __name__ == '__main__':
     # import the basic classes
     from evaluation.EvalRSRunner import EvalRSRunner
     from evaluation.EvalRSRunner import ChallengeDataset
-    from submission.Track2Vec import Track2Vec
+    from src.Track2Vec import Track2Vec
     print('\n==== Starting evaluation script at: {} ====\n'.format(datetime.utcnow()))
     # load the dataset
     print('\n==== Loading dataset at: {} ====\n'.format(datetime.utcnow()))
