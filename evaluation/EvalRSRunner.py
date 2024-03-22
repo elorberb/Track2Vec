@@ -384,7 +384,7 @@ class EvalRSRunner:
         raw_results = []
         fold_results = defaultdict(list)
         for fold, results_path in enumerate(fold_results_path):
-            with open(os.path.join(results_path, f'{variant}_results', 'report.json')) as f:
+            with open(os.path.join(results_path, f'results', 'report.json')) as f:
                 result = json.load(f)
             # save raw reclist output
             raw_results.append(result)

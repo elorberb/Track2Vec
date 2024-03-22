@@ -38,6 +38,21 @@ class Track2Vec(RecModel):
         user_info['playcount'] = user_info['playcount'].fillna(value=0)
 
         return user_info
+    
+    
+    def calculate_track_counts(self, df):
+        # Calculate track counts per user
+        track_counts_df = df.groupby(['user_id', 'track_id']).size().reset_index(name='counts')
+        
+        # Convert to a dictionary format for easier access
+        user_track_counts = {}
+        for row in track_counts_df.itertuples(index=False):
+            if row.user_id not in user_track_counts:
+                user_track_counts[row.user_id] = {}
+            user_track_counts[row.user_id][row.track_id] = row.counts
+
+        self.user_track_counts = user_track_counts
+
 
     def train_playcount(self, df):
         p_1 = df[df['playcount'] <= 10].groupby(['user_id'], sort=False)['track_id'].agg(list)
@@ -95,81 +110,119 @@ class Track2Vec(RecModel):
         for key in self.mappings.keys():
             self.mappings[key]['utc_track_id_sampled'] = utc_dict[key]['utc_track_id_sampled']
 
+
     def train(self, train_df: pd.DataFrame, **kwargs):
         df = train_df[['user_id', 'track_id', 'timestamp', 'user_track_count']].sort_values('timestamp')
         df = pd.DataFrame(df).join(self.users, on='user_id', how='left')
+        self.calculate_track_counts(df)
         
         self.train_playcount(df)
         self.train_gender(df)
         self.train_user_track_count(df)
 
+
     def pred_playcount(self, user, user_playcount, user_tracks):
         if user_playcount <= 10:
-            get_user_embedding = np.mean([self.mymodel_utc1.wv[t] for t in user_tracks if t in self.mymodel_utc1.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_1.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
-        elif 10 < user_playcount and user_playcount <= 100:
-            get_user_embedding = np.mean([self.mymodel_2.wv[t] for t in user_tracks if t in self.mymodel_2.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_2.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
-        elif 100 < user_playcount and user_playcount <= 1000:
-            get_user_embedding = np.mean([self.mymodel_3.wv[t] for t in user_tracks if t in self.mymodel_3.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_3.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_utc1
+        elif 10 < user_playcount <= 100:
+            model = self.mymodel_2
+        elif 100 < user_playcount <= 1000:
+            model = self.mymodel_3
         else:
-            get_user_embedding = np.mean([self.mymodel_4.wv[t] for t in user_tracks if t in self.mymodel_4.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_4.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_4
 
-        user_predictions = list(filter(lambda x: x not in 
-                                        self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
+        # Access the track counts for the current user
+        track_counts = self.user_track_counts.get(user, {})
+        
+        # Compute weighted embeddings
+        weighted_embeddings = []
+        for track_id in user_tracks:
+            if track_id in model.wv:
+                count = track_counts.get(track_id, 1)  # Default count to 1 if not found
+                weighted_embeddings.append(model.wv[track_id] * count)
+        
+        if not weighted_embeddings:
+            return []  # Return empty if no embeddings could be computed
+        
+        get_user_embedding = np.mean(weighted_embeddings, axis=0)
+        max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
+        user_predictions = [
+            k[0] for k in model.wv.most_similar(
+                positive=[get_user_embedding], topn=max_number_of_returned_items
+            )
+        ]
+
+        user_predictions = [
+            x for x in user_predictions if x not in self.mappings[user]["track_id"]
+        ][:self.top_k]
         return user_predictions
+
 
     def pred_gender(self, user, user_gender, user_tracks):
         if user_gender == 'm':
-            get_user_embedding = np.mean([self.mymodel_m.wv[t] for t in user_tracks if t in self.mymodel_m.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k 
-            user_predictions = [k[0] for k in self.mymodel_m.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_m
         elif user_gender == 'f':
-            get_user_embedding = np.mean([self.mymodel_f.wv[t] for t in user_tracks if t in self.mymodel_f.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
-            user_predictions = [k[0] for k in self.mymodel_f.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_f
         else:
-            get_user_embedding = np.mean([self.mymodel_n.wv[t] for t in user_tracks if t in self.mymodel_n.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
-            user_predictions = [k[0] for k in self.mymodel_n.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_n
 
-        user_predictions = list(filter(lambda x: x not in 
-                                        self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
+        # Access the track counts for the current user
+        track_counts = self.user_track_counts.get(user, {})
+        
+        # Compute weighted embeddings
+        weighted_embeddings = []
+        for track_id in user_tracks:
+            if track_id in model.wv:
+                count = track_counts.get(track_id, 1)  # Default count to 1 if not found
+                weighted_embeddings.append(model.wv[track_id] * count)
+        
+        if not weighted_embeddings:
+            return []  # Return empty if no embeddings could be computed
+        
+        get_user_embedding = np.mean(weighted_embeddings, axis=0)
+        max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
+        user_predictions = [
+            k[0] for k in model.wv.most_similar(positive=[get_user_embedding], topn=max_number_of_returned_items)
+        ]
+
+        user_predictions = [
+            x for x in user_predictions if x not in self.mappings[user]["track_id"]
+        ][:self.top_k]
         return user_predictions
+
 
     def pred_user_track_count(self, user, user_track_count, user_tracks):
         if user_track_count <= 100:
-            get_user_embedding = np.mean([self.mymodel_utc1.wv[t] for t in user_tracks if t in self.mymodel_utc1.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_utc1.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
-        elif 100 < user_track_count and user_track_count <= 1000:
-            get_user_embedding = np.mean([self.mymodel_utc2.wv[t] for t in user_tracks if t in self.mymodel_utc2.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_utc2.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_utc1
+        elif 100 < user_track_count <= 1000:
+            model = self.mymodel_utc2
         else:
-            get_user_embedding = np.mean([self.mymodel_utc3.wv[t] for t in user_tracks if t in self.mymodel_utc3.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_utc3.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.mymodel_utc3
 
-        user_predictions = list(filter(lambda x: x not in 
-                                        self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
+        # Access the track counts for the current user
+        track_counts = self.user_track_counts.get(user, {})
+        
+        # Compute weighted embeddings
+        weighted_embeddings = []
+        for track_id in user_tracks:
+            if track_id in model.wv:
+                count = track_counts.get(track_id, 1)  # Default count to 1 if not found
+                weighted_embeddings.append(model.wv[track_id] * count)
+        
+        if not weighted_embeddings:
+            return []  # Return empty if no embeddings could be computed
+        
+        get_user_embedding = np.mean(weighted_embeddings, axis=0)
+        max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
+        user_predictions = [
+            k[0] for k in model.wv.most_similar(positive=[get_user_embedding], topn=max_number_of_returned_items)
+        ]
+
+        user_predictions = [
+            x for x in user_predictions if x not in self.mappings[user]["track_id"]
+        ][:self.top_k]
         return user_predictions
+
 
     def ensemble(self, pred_1, pred_2, pred_3):
         all_pred = list(itertools.chain(pred_1, pred_2, pred_3))
