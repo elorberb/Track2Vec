@@ -95,7 +95,7 @@ class Track2Vec(RecModel):
         for key in self.mappings.keys():
             self.mappings[key]['utc_track_id_sampled'] = utc_dict[key]['utc_track_id_sampled']
 
-    def train(self, train_df: pd.DataFrame, **kwargs):
+    def train(self, train_df: pd.DataFrame):
         df = train_df[['user_id', 'track_id', 'timestamp', 'user_track_count']].sort_values('timestamp')
         df = pd.DataFrame(df).join(self.users, on='user_id', how='left')
         
