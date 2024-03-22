@@ -3,7 +3,7 @@ from datetime import datetime
 
 # set hyperparameters for Track2Vec
 vector_size = 100
-epoch = 1
+epoch = 10
 top_k = 100
 window = 60
 seed = 27
@@ -24,7 +24,8 @@ if __name__ == '__main__':
     print('\n==== Init runner at: {} ====\n'.format(datetime.utcnow()))
     # run the evaluation loop
     runner = EvalRSRunner(
-        dataset = dataset
+        dataset = dataset,
+        email="etay"
         )
     print('==== Runner loaded, starting loop at: {} ====\n'.format(datetime.utcnow()))
     my_model = Track2Vec(
