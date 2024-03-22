@@ -343,6 +343,7 @@ class EvalRSRunner:
             upload: bool = True,
             limit: int = 0,
             custom_RecList: RecList = None,
+            variant = 'default', 
             debug=True,
             # these are additional arguments for training the model, if you need
             # to pass additional stuff
@@ -383,7 +384,7 @@ class EvalRSRunner:
         raw_results = []
         fold_results = defaultdict(list)
         for fold, results_path in enumerate(fold_results_path):
-            with open(os.path.join(results_path, 'results', 'report.json')) as f:
+            with open(os.path.join(results_path, f'{variant}_results', 'report.json')) as f:
                 result = json.load(f)
             # save raw reclist output
             raw_results.append(result)
