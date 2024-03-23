@@ -3,7 +3,7 @@ from datetime import datetime
 
 # set hyperparameters for Track2Vec
 vector_size = 100
-epoch = 10
+epoch = 1
 top_k = 100
 window = 60
 seed = 27
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # load the dataset
     print('\n==== Loading dataset at: {} ====\n'.format(datetime.utcnow()))
     # this will load the dataset with the default values for the challenge
-    dataset = ChallengeDataset(seed = seed, num_folds = 4)
+    dataset = ChallengeDataset(seed = seed, num_folds = 1)
     print('\n==== Init runner at: {} ====\n'.format(datetime.utcnow()))
     # run the evaluation loop
     runner = EvalRSRunner(

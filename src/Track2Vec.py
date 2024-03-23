@@ -37,7 +37,28 @@ class Track2Vec(RecModel):
         user_info['country'] = user_info['country'].fillna(value='UNKNOWN')
         user_info['playcount'] = user_info['playcount'].fillna(value=0)
 
+        # Define a function for categorizing age
+        def categorize_age(age):
+            if age < 18:
+                return 'Youth'
+            elif 18 <= age <= 24:
+                return 'YoungAdults'
+            elif 25 <= age <= 34:
+                return 'EarlyCareer'
+            elif 35 <= age <= 44:
+                return 'MidCareer'
+            elif 45 <= age <= 54:
+                return 'EstablishedAdults'
+            elif age >= 55:
+                return 'Seniors'
+            else:
+                return 'Unknown'  # Assuming negative or zero age is invalid and represents unknown
+
+        # Apply the categorize_age function to the 'age' column
+        user_info['age_category'] = user_info['age'].apply(categorize_age)
+
         return user_info
+
 
     def train_playcount(self, df):
         p_1 = df[df['playcount'] <= 10].groupby(['user_id'], sort=False)['track_id'].agg(list)
@@ -51,10 +72,10 @@ class Track2Vec(RecModel):
         self.mymodel_4 = Word2Vec(p_4.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4) #, hashfxn=hash)
 
         p = pd.concat([p_1, p_2, p_3, p_4])
-
         user_tracks = pd.DataFrame(p)
         user_tracks['playcount_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40)) 
         self.mappings = user_tracks.T.to_dict() # {"user_k" : {"track_id" : [...], "track_id_sampled" : [...]}}
+        
 
     def train_gender(self, df):
         p_m = df[df['gender'] == 'm'].groupby(['user_id'], sort=False)['track_id'].agg(list)
@@ -72,6 +93,32 @@ class Track2Vec(RecModel):
         gender_dict = user_tracks.T.to_dict()
         for key in self.mappings.keys():
             self.mappings[key]['gender_track_id_sampled'] = gender_dict[key]['gender_track_id_sampled']
+            
+            
+    def train_age(self, df):
+        age_categories = ['Youth', 'YoungAdults', 'EarlyCareer', 'MidCareer', 'EstablishedAdults', 'Seniors']
+        for category in age_categories:
+            # Filter tracks by age category and aggregate them by user
+            p_category = df[df['age_category'] == category].groupby(['user_id'], sort=False)['track_id'].agg(list)
+            
+            # Train a Word2Vec model for this age category
+            model_name = 'mymodel_' + category
+            setattr(self, model_name, Word2Vec(p_category.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4))
+            
+        # Optional: Create a combined DataFrame for all tracks and their age category to simplify sampling
+        # This step assumes that `age_category` is already a column in the df DataFrame
+        user_tracks = df.groupby(['user_id', 'age_category'])['track_id'].agg(list).reset_index()
+        
+        # For each user, sample tracks based on age category
+        user_tracks['age_track_id_sampled'] = user_tracks.apply(lambda x: random.choices(x['track_id'], k=40), axis=1)
+        
+        # Convert to dictionary for efficient look-up
+        age_tracks_dict = user_tracks.pivot(index='user_id', columns='age_category', values='age_track_id_sampled').to_dict(orient='index')
+        
+        # Update the mappings with age-based track samples
+        for user_id, age_tracks in age_tracks_dict.items():
+            self.mappings[user_id].update(age_tracks)
+
 
     def train_user_track_count(self, df):
         df_trackid = df.groupby(['user_id'], sort=False)['track_id'].agg(list)
@@ -97,11 +144,17 @@ class Track2Vec(RecModel):
 
     def train(self, train_df: pd.DataFrame):
         df = train_df[['user_id', 'track_id', 'timestamp', 'user_track_count']].sort_values('timestamp')
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['hod'] = df['timestamp'].dt.hour
         df = pd.DataFrame(df).join(self.users, on='user_id', how='left')
+        
+        # Filter out users with age -1
+        df = df[df['age'] != -1]
         
         self.train_playcount(df)
         self.train_gender(df)
         self.train_user_track_count(df)
+        self.train_age(df)
 
     def pred_playcount(self, user, user_playcount, user_tracks):
         if user_playcount <= 10:
@@ -149,6 +202,33 @@ class Track2Vec(RecModel):
         user_predictions = list(filter(lambda x: x not in 
                                         self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
         return user_predictions
+    
+    def pred_age(self, user, user_age_category, user_tracks):
+        # Determine the model name based on the age category
+        model_name = 'mymodel_' + user_age_category
+        
+        # Fetch the appropriate model for the user's age category
+        model = getattr(self, model_name, None)
+        
+        # If no model is found for the age category, it means we don't have sufficient data for that category
+        # In such cases, you might want to use a default model or handle the situation as per your requirements
+        if not model:
+            return []  # Or handle with a default prediction
+        
+        # Get the mean user embedding based on the tracks associated with the user's age category
+        get_user_embedding = np.mean([model.wv[t] for t in user_tracks if t in model.wv], axis=0)
+        
+        # Calculate the maximum number of items to return - considering the existing tracks in user history
+        max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
+        
+        # Retrieve the most similar tracks based on the user embedding
+        user_predictions = [k[0] for k in model.wv.most_similar(positive=[get_user_embedding], topn=max_number_of_returned_items)]
+        
+        # Filter out tracks that are already in the user's listening history
+        user_predictions = [x for x in user_predictions if x not in self.mappings[user]["track_id"]][:self.top_k]
+        
+        return user_predictions
+
 
     def pred_user_track_count(self, user, user_track_count, user_tracks):
         if user_track_count <= 100:
@@ -171,34 +251,25 @@ class Track2Vec(RecModel):
                                         self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
         return user_predictions
 
-    def ensemble(self, pred_1, pred_2, pred_3):
-        all_pred = list(itertools.chain(pred_1, pred_2, pred_3))
+
+    def ensemble(self, pred_1, pred_2, pred_3, pred_4):
+        all_pred = list(itertools.chain(pred_1, pred_2, pred_3, pred_4))
         counter = Counter(all_pred)
         counter_top_k = counter.most_common(self.top_k)
         pred = []
-        for tuple in counter_top_k:
-            if tuple[1] > 1:
-                pred.append(tuple[0])
+        for item, _ in counter_top_k:
+            pred.append(item)
 
-        for i in range(self.top_k):
-            if pred_1[0] not in pred:
-                pred.append(pred_1.pop(0))
-            else:
-                pred_1.pop(0)
-            if pred_2[0] not in pred:
-                pred.append(pred_2.pop(0))
-            else:
-                pred_2.pop(0)
-            if pred_3[0] not in pred:
-                pred.append(pred_3.pop(0))
-            else:
-                pred_3.pop(0)
-        
-        return pred[:100]
+        return pred[:self.top_k]
+
 
     def predict(self, user_ids: pd.DataFrame):
         user_ids = user_ids.copy()
         k = self.top_k
+        
+        # Filter out users with age -1
+        user_ids = user_ids[user_ids['user_id'].isin(self.users[self.users['age'] != -1].index)]
+    
         
         pbar = tqdm(total=len(user_ids), position=0)
         predictions = []
@@ -208,28 +279,31 @@ class Track2Vec(RecModel):
                 pbar.update(1)
                 continue
             valid_user_ids.append(user)  # Add the valid user ID to the list
-            user_tracks_playcount = self.mappings[user]['playcount_track_id_sampled']
-            user_tracks_gender = self.mappings[user]['gender_track_id_sampled']
-            user_tracks_utc = self.mappings[user]['utc_track_id_sampled']
+            user_age_category = self.users.loc[user]['age_category']  # Assuming age_category is already populated
+            user_tracks_playcount = self.mappings[user].get('playcount_track_id_sampled', [])
+            user_tracks_gender = self.mappings[user].get('gender_track_id_sampled', [])
+            user_tracks_age = self.mappings[user].get(user_age_category + '_track_id_sampled', [])  # Age-based tracks
 
-            user_playcount = self.users.loc[[user]]['playcount'].values[0]
-            user_gender = self.users.loc[[user]]['gender'].values[0]
+            user_playcount = self.users.loc[user]['playcount']
+            user_gender = self.users.loc[user]['gender']
             user_track_count = self.train_df.loc[user]['user_track_count']
 
+            # Get predictions for playcount, gender, and age
             pred_1 = self.pred_playcount(user, user_playcount, user_tracks_playcount)
             pred_2 = self.pred_gender(user, user_gender, user_tracks_gender)
-            pred_3 = self.pred_user_track_count(user, user_track_count, user_tracks_utc)
+            pred_3 = self.pred_user_track_count(user, user_track_count, user_tracks_playcount)  # Assuming user_tracks_playcount contains the tracks
+            pred_4 = self.pred_age(user, user_age_category, user_tracks_age)  # Age-based prediction
 
-            user_predictions = self.ensemble(pred_1, pred_2, pred_3)
+            # Combine all predictions
+            user_predictions = self.ensemble(pred_1, pred_2, pred_3, pred_4)
             predictions.append(user_predictions)
 
             pbar.update(1)
         pbar.close()
 
-        # users = user_ids["user_id"].values.reshape(-1, 1)
         valid_users_array = np.array(valid_user_ids).reshape(-1, 1)
         predictions = np.array(predictions)
-        # predictions = np.concatenate([users, predictions], axis=1)
         predictions = np.concatenate([valid_users_array, predictions], axis=1)
 
         return pd.DataFrame(predictions, columns=['user_id', *[str(i) for i in range(k)]]).set_index('user_id')
+
