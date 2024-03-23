@@ -5,7 +5,8 @@ from gensim.models import Word2Vec
 from tqdm import tqdm
 import random
 
-from collections import Counter
+from collections import Counter, defaultdict
+
 import itertools
 import time
 
@@ -170,6 +171,24 @@ class Track2Vec(RecModel):
         user_predictions = list(filter(lambda x: x not in 
                                         self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
         return user_predictions
+    
+
+    def borda_count_ensemble(self, *preds):
+        """
+        Combine predictions from multiple models using the Borda count method.
+        """
+        scores = defaultdict(int)
+        for pred in preds:
+            for rank, track_id in enumerate(pred):
+                # Assign points inversely to rank; higher rank gets more points
+                scores[track_id] += (len(pred) - rank)
+        
+        # Sort tracks by their total points in descending order and select top-k
+        final_ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        top_k_tracks = [track_id for track_id, _ in final_ranking[:self.top_k]]
+        
+        return top_k_tracks
+
 
     def ensemble(self, pred_1, pred_2, pred_3):
         all_pred = list(itertools.chain(pred_1, pred_2, pred_3))
@@ -194,7 +213,7 @@ class Track2Vec(RecModel):
             else:
                 pred_3.pop(0)
         
-        return pred[:100]
+        return pred[:self.top_k]
 
     def predict(self, user_ids: pd.DataFrame):
         user_ids = user_ids.copy()
@@ -220,7 +239,7 @@ class Track2Vec(RecModel):
             pred_2 = self.pred_gender(user, user_gender, user_tracks_gender)
             pred_3 = self.pred_user_track_count(user, user_track_count, user_tracks_utc)
 
-            user_predictions = self.ensemble(pred_1, pred_2, pred_3)
+            user_predictions = self.borda_count_ensemble(pred_1, pred_2, pred_3)
             predictions.append(user_predictions)
 
             pbar.update(1)
