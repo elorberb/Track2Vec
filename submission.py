@@ -3,12 +3,10 @@ from datetime import datetime
 
 # set hyperparameters for Track2Vec
 vector_size = 100
-epoch = 10
+epoch = 1
 top_k = 100
-window = 60
 seed = 27
-negative = 5
-print(f'vector_size: {vector_size} | epoch: {epoch} | top_k: {top_k} | window: {window} | seed: {seed} | ns: {negative}')
+print(f'vector_size: {vector_size} | epoch: {epoch} | top_k: {top_k} | seed: {seed}')
 
 # run the evaluation loop when the script is called directly
 if __name__ == '__main__':
@@ -33,9 +31,7 @@ if __name__ == '__main__':
         users = dataset.df_users,
         top_k = top_k,
         vector_size = vector_size,
-        window = window,
         epochs = epoch,
-        negative = negative
     )
     runner.evaluate(
         model = my_model,
