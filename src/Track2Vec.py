@@ -80,24 +80,34 @@ class Track2Vec(RecModel):
         
         # prepare data for biltsm models
         p_1_X, p_1_y, p_1_max_sequence_length = self._prepare_data_for_bilstm(p_1.tolist())
-        # p_2_X, p_2_y, p_2_max_sequence_length = self._prepare_data_for_bilstm(p_2.tolist())
-        # p_3_X, p_3_y, p_3_max_sequence_length = self._prepare_data_for_bilstm(p_3.tolist())
-        # p_4_X, p_4_y, p_4_max_sequence_length = self._prepare_data_for_bilstm(p_4.tolist())
+        p_2_X, p_2_y, p_2_max_sequence_length = self._prepare_data_for_bilstm(p_2.tolist())
+        p_3_X, p_3_y, p_3_max_sequence_length = self._prepare_data_for_bilstm(p_3.tolist())
+        p_4_X, p_4_y, p_4_max_sequence_length = self._prepare_data_for_bilstm(p_4.tolist())
         
         # Train BiLSTM models WITHIN each segment
-        self.model_1 = BiLSTM(vocab_size=self.vocab_size, 
-                            max_sequence_length=p_1_max_sequence_length,
-                            learning_rate=0.001,
-                            vector_size=self.vector_size)
-        # self.model_2 = BiLSTM(p_2.values.tolist(), p_2_max_sequence_length, 0.001, self.vector_size)    
-        # self.model_3 = BiLSTM(p_3.values.tolist(), p_3_max_sequence_length, 0.001, self.vector_size)
-        # self.model_4 = BiLSTM(p_4.values.tolist(), p_4_max_sequence_length, 0.001, self.vector_size)
+        self.model_p1 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_1_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        self.model_p2 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_2_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)    
+        self.model_p3 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_3_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        self.model_p4 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_4_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+
         
         # train models cuncurrently
-        self.model_1.train(p_1_X, p_1_y, batch_size=32, epochs=self.epochs)
-        # self.model_2.train(p_2_X, p_2_y, batch_size=32, epochs=self.epochs)
-        # self.model_3.train(p_3_X, p_3_y, batch_size=32, epochs=self.epochs)
-        # self.model_4.train(p_4_X, p_4_y, batch_size=32, epochs=self.epochs)
+        self.model_p1.train(p_1_X, p_1_y, batch_size=32, epochs=self.epochs)
+        self.model_p2.train(p_2_X, p_2_y, batch_size=32, epochs=self.epochs)
+        self.model_p3.train(p_3_X, p_3_y, batch_size=32, epochs=self.epochs)
+        self.model_p4.train(p_4_X, p_4_y, batch_size=32, epochs=self.epochs)
 
         
         p = pd.concat([p_1, p_2, p_3, p_4])
@@ -110,10 +120,30 @@ class Track2Vec(RecModel):
         p_m = df[df['gender'] == 'm'].groupby(['user_id'], sort=False)['track_id'].agg(list)
         p_f = df[df['gender'] == 'f'].groupby(['user_id'], sort=False)['track_id'].agg(list)
         p_n = df[(df['gender'] != 'm') & (df['gender'] != 'f')].groupby(['user_id'], sort=False)['track_id'].agg(list)
-
-        self.mymodel_m = Word2Vec(p_m.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
-        self.mymodel_f = Word2Vec(p_f.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
-        self.mymodel_n = Word2Vec(p_n.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
+        
+        # prepare data for BiLSTM models
+        p_m_X, p_m_y, p_m_max_sequence_length = self._prepare_data_for_bilstm(p_m.tolist())
+        p_f_X, p_f_y, p_f_max_sequence_length = self._prepare_data_for_bilstm(p_f.tolist())
+        p_n_X, p_n_y, p_n_max_sequence_length = self._prepare_data_for_bilstm(p_n.tolist())
+        
+        # Train BiLSTM models for each gender segment
+        self.model_m = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_m_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        self.model_f = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_f_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        self.model_n = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_n_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        
+        # Train models concurrently (assuming you have a method to train them)
+        self.model_m.train(p_m_X, p_m_y, batch_size=32, epochs=self.epochs)
+        self.model_f.train(p_f_X, p_f_y, batch_size=32, epochs=self.epochs)
+        self.model_n.train(p_n_X, p_n_y, batch_size=32, epochs=self.epochs)
         
         p = pd.concat([p_m, p_f, p_n])
 
@@ -122,6 +152,7 @@ class Track2Vec(RecModel):
         gender_dict = user_tracks.T.to_dict()
         for key in self.mappings.keys():
             self.mappings[key]['gender_track_id_sampled'] = gender_dict[key]['gender_track_id_sampled']
+
 
     def train_user_track_count(self, df):
         df_trackid = df.groupby(['user_id'], sort=False)['track_id'].agg(list)
@@ -133,84 +164,93 @@ class Track2Vec(RecModel):
         p_2 = df[(100 < df['user_track_count']) & (df['user_track_count'] <= 1000)]['track_id']
         p_3 = df[1000 < df['user_track_count']]['track_id']
 
-        self.mymodel_utc1 = Word2Vec(p_1.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
-        self.mymodel_utc2 = Word2Vec(p_2.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
-        self.mymodel_utc3 = Word2Vec(p_3.values.tolist(), min_count=0, vector_size=self.vector_size, window=self.window, negative=self.negative, epochs=self.epochs, sg=0, workers=4)
+        # Prepare data for BiLSTM models
+        p_1_X, p_1_y, p_1_max_sequence_length = self._prepare_data_for_bilstm(p_1.tolist())
+        p_2_X, p_2_y, p_2_max_sequence_length = self._prepare_data_for_bilstm(p_2.tolist())
+        p_3_X, p_3_y, p_3_max_sequence_length = self._prepare_data_for_bilstm(p_3.tolist())
+
+        # Train BiLSTM models for each user track count segment
+        self.model_utc1 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_1_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        self.model_utc2 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_2_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+        self.model_utc3 = BiLSTM(vocab_size=self.vocab_size, 
+                                max_sequence_length=p_3_max_sequence_length,
+                                learning_rate=0.001,
+                                vector_size=self.vector_size)
+
+        # Train models concurrently
+        self.model_utc1.train(p_1_X, p_1_y, batch_size=32, epochs=self.epochs)
+        self.model_utc2.train(p_2_X, p_2_y, batch_size=32, epochs=self.epochs)
+        self.model_utc3.train(p_3_X, p_3_y, batch_size=32, epochs=self.epochs)
 
         p = pd.concat([p_1, p_2, p_3])
 
         user_tracks = pd.DataFrame(p)
-        user_tracks['utc_track_id_sampled'] = user_tracks['track_id'].apply(lambda x : random.choices(x, k=40))
+        user_tracks['utc_track_id_sampled'] = user_tracks['track_id'].apply(lambda x: random.choices(x, k=40))
         utc_dict = user_tracks.T.to_dict()
         for key in self.mappings.keys():
             self.mappings[key]['utc_track_id_sampled'] = utc_dict[key]['utc_track_id_sampled']
+
 
     def train(self, train_df: pd.DataFrame):
         df = train_df[['user_id', 'track_id', 'timestamp', 'user_track_count']].sort_values('timestamp')
         df = pd.DataFrame(df).join(self.users, on='user_id', how='left')
         
         self.train_playcount(df)
-        # self.train_gender(df)
-        # self.train_user_track_count(df)
+        self.train_gender(df)
+        self.train_user_track_count(df)
 
     def pred_playcount(self, user, user_playcount, user_tracks):
     
         # Choose the right model based on user playcount
-        # if user_playcount <= 10:
-        #     model = self.model_1
-        # elif 10 < user_playcount <= 100:
-        #     model = self.model_2
-        # elif 100 < user_playcount <= 1000:
-        #     model = self.model_3
-        # else:
-        #     model = self.model_4
+        if user_playcount <= 10:
+            model = self.model_p1
+        elif 10 < user_playcount <= 100:
+            model = self.model_p2
+        elif 100 < user_playcount <= 1000:
+            model = self.model_p3
+        else:
+            model = self.model_p4
 
         # Predict the next track(s) using the model
-        predictions = self.model_1.predict_next_n_tracks(user_tracks, self.token_to_track_id, n=self.top_k)
+        predictions = model.predict_next_n_tracks(user_tracks, self.token_to_track_id, n=self.top_k)
         
         return predictions
 
     def pred_gender(self, user, user_gender, user_tracks):
+        # Choose the right model based on user gender
         if user_gender == 'm':
-            get_user_embedding = np.mean([self.mymodel_m.wv[t] for t in user_tracks if t in self.mymodel_m.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k 
-            user_predictions = [k[0] for k in self.mymodel_m.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.model_gender_m
         elif user_gender == 'f':
-            get_user_embedding = np.mean([self.mymodel_f.wv[t] for t in user_tracks if t in self.mymodel_f.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
-            user_predictions = [k[0] for k in self.mymodel_f.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
-        else:
-            get_user_embedding = np.mean([self.mymodel_n.wv[t] for t in user_tracks if t in self.mymodel_n.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k
-            user_predictions = [k[0] for k in self.mymodel_n.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.model_gender_f
+        else:  # Assuming 'n' for non-binary or unspecified genders
+            model = self.model_gender_n
 
-        user_predictions = list(filter(lambda x: x not in 
-                                        self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
-        return user_predictions
+        # Predict the next track(s) using the model
+        predictions = model.predict_next_n_tracks(user_tracks, self.token_to_track_id, n=self.top_k)
+        
+        return predictions
+
 
     def pred_user_track_count(self, user, user_track_count, user_tracks):
+        # Choose the right model based on user track count
         if user_track_count <= 100:
-            get_user_embedding = np.mean([self.mymodel_utc1.wv[t] for t in user_tracks if t in self.mymodel_utc1.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_utc1.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
-        elif 100 < user_track_count and user_track_count <= 1000:
-            get_user_embedding = np.mean([self.mymodel_utc2.wv[t] for t in user_tracks if t in self.mymodel_utc2.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_utc2.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.model_utc1
+        elif 100 < user_track_count <= 1000:
+            model = self.model_utc2
         else:
-            get_user_embedding = np.mean([self.mymodel_utc3.wv[t] for t in user_tracks if t in self.mymodel_utc3.wv], axis=0)
-            max_number_of_returned_items = len(self.mappings[user]["track_id"]) + self.top_k # filter out stuff from the user history
-            user_predictions = [k[0] for k in self.mymodel_utc3.wv.most_similar(positive=[get_user_embedding], 
-                                                                        topn=max_number_of_returned_items)]
+            model = self.model_utc3
 
-        user_predictions = list(filter(lambda x: x not in 
-                                        self.mappings[user]["track_id"], user_predictions))[0:self.top_k]
-        return user_predictions
+        # Predict the next track(s) using the model
+        predictions = model.predict_next_n_tracks(user_tracks, self.token_to_track_id, n=self.top_k)
+        
+        return predictions
+
 
     def ensemble(self, pred_1, pred_2, pred_3):
         all_pred = list(itertools.chain(pred_1, pred_2, pred_3))
@@ -250,19 +290,19 @@ class Track2Vec(RecModel):
                 continue
             valid_user_ids.append(user)  # Add the valid user ID to the list
             user_tracks_playcount = self.mappings[user]['playcount_track_id_sampled']
-            # user_tracks_gender = self.mappings[user]['gender_track_id_sampled']
-            # user_tracks_utc = self.mappings[user]['utc_track_id_sampled']
+            user_tracks_gender = self.mappings[user]['gender_track_id_sampled']
+            user_tracks_utc = self.mappings[user]['utc_track_id_sampled']
 
             user_playcount = self.users.loc[[user]]['playcount'].values[0]
-            # user_gender = self.users.loc[[user]]['gender'].values[0]
-            # user_track_count = self.train_df.loc[user]['user_track_count']
+            user_gender = self.users.loc[[user]]['gender'].values[0]
+            user_track_count = self.train_df.loc[user]['user_track_count']
 
             pred_1 = self.pred_playcount(user, user_playcount, user_tracks_playcount)
-            # pred_2 = self.pred_gender(user, user_gender, user_tracks_gender)
-            # pred_3 = self.pred_user_track_count(user, user_track_count, user_tracks_utc)
+            pred_2 = self.pred_gender(user, user_gender, user_tracks_gender)
+            pred_3 = self.pred_user_track_count(user, user_track_count, user_tracks_utc)
 
-            # user_predictions = self.ensemble(pred_1, pred_2, pred_3)
-            # predictions.append(user_predictions)
+            user_predictions = self.ensemble(pred_1, pred_2, pred_3)
+            predictions.append(user_predictions)
             predictions.append(pred_1)
 
 
